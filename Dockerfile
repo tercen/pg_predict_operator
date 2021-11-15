@@ -1,4 +1,4 @@
-FROM tercen/pg_prediction/:1.0.1
+FROM tercen/pg_prediction:1.0.1
 
 ENV RENV_VERSION 0.13.2
 
