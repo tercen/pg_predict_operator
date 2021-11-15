@@ -1,10 +1,24 @@
 {
-  "name": "Template_R_operator",
-  "description": "Calculate the mathamatical average of the data points in a cell.",
-  "tags": ["basic statistics"],
+  "name": "PG Prediction Operator",
+  "description": ".",
+  "tags": ["pamsoft grid"],
   "authors": ["tercen"],
-  "urls": ["https://github.com/tercen/template_R_operator"],
-  "properties": []
+  "urls": ["https://github.com/tercen/pg_predict_operator"],
+    "properties": [
+   {
+    "kind": "DoubleProperty",
+    "name": "MaxComponents",
+    "defaultValue":2,
+    "description": ""
+    },
+    
+    {
+    "kind": "DoubleProperty",
+    "name": "Permutations",
+    "defaultValue":5,
+    "description": ""
+    }
+  ]
 }
 
 

@@ -13,43 +13,45 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  build-docker:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-    - name: VERSION
-      run: |
-        echo "TAG=${GITHUB_REF##*/}" >> $GITHUB_ENV
-    - name: Pull tercenctl
-      run: docker pull tercen/tercenctl:release
-    - name: Install operator
-      run: |
-        docker run --rm \
-          -e TERCEN_USERNAME=${{ secrets.TERCEN_TEST_OPERATOR_USERNAME }} \
-          -e TERCEN_PASSWORD=${{ secrets.TERCEN_TEST_OPERATOR_PASSWORD }} \
-          -e TERCEN_URI=${{ secrets.TERCEN_TEST_OPERATOR_URI }} \
-          -e GITHUB_TOKEN=${GITHUB_TOKEN} \
-          tercen/tercenctl:release operator install --rm --tag ${TAG} --repo ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}
-    - name: Create required package.json
-      run: echo '{}' > package.json
-    - name: Build changelog
-      id: Changelog
-      uses: tercen/generate-changelog-action@master
-    - name: Create release
-      id: create_release
-      uses: actions/create-release@latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        body: ${{steps.Changelog.outputs.changelog}}
-        draft: false
-        prerelease: false
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - name: TERCEN_VERSION
+        run: |
+          echo "TERCEN_VERSION=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - name: SEMVER TERCEN_VERSION
+        run: |
+          SEMVER=( ${TERCEN_VERSION//./ } )
+          echo "TERCEN_MAJOR=${SEMVER[0]}" >> $GITHUB_ENV
+          echo "TERCEN_MINOR=${SEMVER[1]}" >> $GITHUB_ENV
+          echo "TERCEN_PATCH=${SEMVER[2]}" >> $GITHUB_ENV
+      - name: COMMIT_NUMBER
+        run: |
+          echo "COMMIT_NUMBER=${GITHUB_SHA::8}" >> $GITHUB_ENV
+      - name: docker login
+        run: docker login --username ${{ secrets.DOCKER_HUB_USERNAME }} --password ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: docker build
+        run: docker build -t tercen/pg_predict_operator .
+      - name: docker tag/push COMMIT_NUMBER
+        run: |
+          docker tag tercen/pg_predict_operator tercen/pg_predict_operator:${COMMIT_NUMBER}
+          docker push tercen/pg_predict_operator:${COMMIT_NUMBER}
+      - name: docker tag/push latest
+        run: |
+          docker tag tercen/pg_predict_operator tercen/pg_predict_operator:latest
+          docker push tercen/pg_predict_operator:latest
+        if: env.TERCEN_VERSION == 'main'
+      - name: docker minor tag version
+        run: |
+          docker tag tercen/pg_predict_operator tercen/pg_predict_operator:${TERCEN_MAJOR}
+          docker push tercen/pg_predict_operator:${TERCEN_MAJOR}
+          docker tag tercen/pg_predict_operator tercen/pg_predict_operator:${TERCEN_MAJOR}.${TERCEN_MINOR}
+          docker push tercen/pg_predict_operator:${TERCEN_MAJOR}.${TERCEN_MINOR}
+          docker tag tercen/pg_predict_operator tercen/pg_predict_operator:${TERCEN_MAJOR}.${TERCEN_MINOR}.${TERCEN_PATCH}
+          docker push tercen/pg_predict_operator:${TERCEN_MAJOR}.${TERCEN_MINOR}.${TERCEN_PATCH}
+        if: env.TERCEN_PATCH != ''
