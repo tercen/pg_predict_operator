@@ -4,7 +4,7 @@
   "tags": ["pamsoft grid"],
   "authors": ["tercen"],
   "urls": ["https://github.com/tercen/pg_predict_operator"],
-  "container": "tercen/pg_predict_operator:0.0.1",
+  "container": "tercen/pg_predict_operator:0.0.2",
     "properties": [
    {
     "kind": "DoubleProperty",
