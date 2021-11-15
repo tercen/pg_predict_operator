@@ -5,8 +5,8 @@ library(jsonlite)
 
 library(tim)
 
-MCR_PATH <- "//home/rstudio/mcr/v99"
-MATCALL  <- "/home/rstudio/prediction_exe/run_ppr_prediction_main.sh"
+MCR_PATH <- "/opt/mcr/v99"
+MATCALL  <- "/mcr/exe/run_ppr_prediction_main.sh"
 
 
 
