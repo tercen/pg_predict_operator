@@ -55,8 +55,8 @@ find_schema_by_factor_name2 <- function(ctx, factor.name) {
 
 predict <- function(df, props, colColumns, rowColumns, colorColumns, mdlSchema){
   trainingFile <- tempfile(fileext = ".mat") 
-  outfile      <- tempfile(fileext = ".mat") 
-  outfileMat   <- tempfile(fileext = ".txt") 
+  outfile      <- tempfile(fileext = ".txt") 
+  outfileMat   <- tempfile(fileext = ".mat") 
   
   table <- ctx$client$tableSchemaService$select(mdlSchema$id, Map(function(x) x$name, mdlSchema$columns), 0, mdlSchema$nRows)
   table <- as_tibble(table)
@@ -121,10 +121,16 @@ predict <- function(df, props, colColumns, rowColumns, colorColumns, mdlSchema){
   print(system2(MATCALL, 
                 args=c(MCR_PATH, " \"--infile=", jsonFile[1], "\"") ))
   
-  outDf <- as.data.frame( read.csv(outfileMat) )
+  outDf <- as.data.frame( read.csv(outfile) )
   
   
-  outJson <- read_json( outfile, simplifyVector = TRUE  )
+  predModel <- readBin(outfileMat, "raw", 10e6)
+  
+  
+  outDf2 <- data.frame(
+    model = "model1",
+    .base64.serialized.r.model = c(tim::serialise_to_string(predModel))
+  )
   
   outDf <- outDf %>%
     filter( rowSeq == 0 ) %>%
@@ -137,7 +143,7 @@ predict <- function(df, props, colColumns, rowColumns, colorColumns, mdlSchema){
   unlink(outfileMat)
   unlink(jsonFile)
 
-  return(outDf)
+  return( list(outDf, outDf2) )
 }
 
 
@@ -202,7 +208,27 @@ df = dplyr::left_join(df, rTable, by = ".ri")
 
 
 
-df %>%
-  predict(props, unlist(colNames), unlist(rowNames), unlist(colorCols), mdlSchema  ) %>%
+tableList <- outDf <- df %>%
+  predict(props, unlist(colNames), unlist(rowNames), unlist(colorCols), mdlSchema  ) 
+
+
+tbl1 <- tableList[[1]]
+tbl2 <- tableList[[2]]
+
+
+join1 = tbl1 %>% 
+  as_relation() %>%
+  left_join_relation(ctx$crelation, ".ci", ctx$crelation$rids) %>%
+  as_join_operator(ctx$cnames, ctx$cnames)
+
+join2 = tbl2 %>% 
+  ctx$addNamespace() %>%
+  as_relation() %>%
+  as_join_operator(list(), list())
+
+# join2 %>%  
+#   save_relation(ctx)
+
+tbl1 %>%
   ctx$addNamespace() %>%
   ctx$save()

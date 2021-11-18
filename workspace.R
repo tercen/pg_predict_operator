@@ -63,8 +63,8 @@ MATCALL  <- "/home/rstudio/prediction_exe/run_ppr_prediction_main.sh"
 
 predict <- function(df, props, colColumns, rowColumns, colorColumns, mdlSchema){
   trainingFile <- tempfile(fileext = ".mat") #"/home/rstudio/projects/pg_predict_operator/classifier.mat"
-  outfile      <- tempfile(fileext = ".mat") #"/home/rstudio/projects/pg_predict_operator/prediction_class.mat"
-  outfileMat   <- tempfile(fileext = ".txt") #"/home/rstudio/projects/pg_predict_operator/pred_results.txt"
+  outfile      <- tempfile(fileext = ".txt") #"/home/rstudio/projects/pg_predict_operator/prediction_class.mat"
+  outfileMat   <- tempfile(fileext = ".mat") #"/home/rstudio/projects/pg_predict_operator/pred_results.txt"
   
   
   table <- ctx$client$tableSchemaService$select(mdlSchema$id, Map(function(x) x$name, mdlSchema$columns), 0, mdlSchema$nRows)
@@ -131,15 +131,17 @@ predict <- function(df, props, colColumns, rowColumns, colorColumns, mdlSchema){
   print(system2(MATCALL, 
           args=c(MCR_PATH, " \"--infile=", jsonFile[1], "\"") ))
   
-  outDf <- as.data.frame( read.csv(outfileMat) )
 
-
-  outJson <- read_json( outfile, simplifyVector = TRUE  )
+  outDf <- as.data.frame( read.csv(outfile) )
   
-  # # With repeated values
-  # outDf <- outDf %>%
-  #   rename(.ci = colSeq) %>%
-  #   rename(.ri = rowSeq)
+  
+  predModel <- readBin(outfileMat, "raw", 10e6)
+  
+  
+  outDf2 <- data.frame(
+    model = "model1",
+    .base64.serialized.r.model = c(tim::serialise_to_string(predModel))
+  )
   
   outDf <- outDf %>%
     filter( rowSeq == 0 ) %>%
@@ -147,20 +149,13 @@ predict <- function(df, props, colColumns, rowColumns, colorColumns, mdlSchema){
     rename(.ci = colSeq) 
 
 
-  # IF the class is needed, then uncomment this part of the code
-  # classifierJsonDf <- fromJSON( txt = readChar(outfileVis, file.info(outfile)$size)  )
-  
 
-  # res <- tim::get_serialized_result(
-  #   df = outDf, object = classifierJsonDf, object_name = "classifierJsonDf", ctx = ctx
-  # )
+  # Cleanup
+  unlink(outfile)
+  unlink(outfileMat)
+  unlink(jsonFile)
   # 
-  # # Cleanup
-  # unlink(outfile)
-  # unlink(outfileMat)
-  # unlink(jsonFile)
-  # 
-  return(outDf)
+  return( list(outDf, outDf2) )
 }
 
 
@@ -228,8 +223,27 @@ df = dplyr::left_join(df, rTable, by = ".ri")
 
 
 
-outDf <- df %>%
-  predict(props, unlist(colNames), unlist(rowNames), unlist(colorCols), mdlSchema  ) %>%
+tableList <- outDf <- df %>%
+  predict(props, unlist(colNames), unlist(rowNames), unlist(colorCols), mdlSchema  ) 
+
+
+tbl1 <- tableList[[1]]
+tbl2 <- tableList[[2]]
+
+
+join1 = tbl1 %>% 
+  as_relation() %>%
+  left_join_relation(ctx$crelation, ".ci", ctx$crelation$rids) %>%
+  as_join_operator(ctx$cnames, ctx$cnames)
+
+join2 = tbl2 %>% 
+  ctx$addNamespace() %>%
+  as_relation() %>%
+  as_join_operator(list(), list())
+
+# join2 %>%  
+#   save_relation(ctx)
+tbl1 %>%
   ctx$addNamespace() %>%
   ctx$save()
 
